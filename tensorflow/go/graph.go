@@ -42,6 +42,7 @@ package tensorflow
 import "C"
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"runtime"
@@ -93,6 +94,17 @@ func (g *Graph) WriteTo(w io.Writer) (int64, error) {
 //
 // Names of imported nodes will be prefixed with prefix.
 func (g *Graph) Import(def []byte, prefix string) error {
+	return g.ImportFromReader(bytes.NewBuffer(def), len(def), prefix)
+}
+
+// ImportFromReader imports the nodes and edges from a serialized representation of
+// another Graph into g.
+//
+// The serialized data must be provided as an io.Reader, along with (an over-estimate of)
+// the size of the data in bytes, which is used to pre-allocate a C buffer.
+//
+// Multiple options can be specified for the newly imported nodes.
+func (g *Graph) ImportFromReader(r io.Reader, size int, prefix string) error {
 	cprefix := C.CString(prefix)
 	defer C.free(unsafe.Pointer(cprefix))
 
@@ -102,16 +114,35 @@ func (g *Graph) Import(def []byte, prefix string) error {
 
 	buf := C.TF_NewBuffer()
 	defer C.TF_DeleteBuffer(buf)
-	// Would have preferred to use C.CBytes, but that does not play well
-	// with "go vet" till https://github.com/golang/go/issues/17201 is
-	// resolved.
-	buf.length = C.size_t(len(def))
-	buf.data = C.malloc(buf.length)
+
+	buf.data = C.malloc(C.size_t(size))
 	if buf.data == nil {
 		return fmt.Errorf("unable to allocate memory")
 	}
 	defer C.free(buf.data)
-	C.memcpy(buf.data, unsafe.Pointer(&def[0]), buf.length)
+
+	// code adapted from io.Copy
+	var nCopied int
+	tmpbuf := make([]byte, 32*1024)
+	for {
+		nr, er := r.Read(tmpbuf)
+		if nr > 0 {
+			C.memcpy(unsafe.Pointer(uintptr(buf.data)+uintptr(nCopied)), unsafe.Pointer(&tmpbuf[0]), C.size_t(nr))
+		}
+		nCopied += nr
+		if nCopied > size {
+			return fmt.Errorf("graph def size to large for pre-allocated buffer")
+		}
+		if er != nil {
+			if er != io.EOF {
+				return er
+			}
+			break
+		}
+	}
+
+	// the actual number of copied bytes may be smaller than size
+	buf.length = C.size_t(nCopied)
 
 	status := newStatus()
 	C.TF_GraphImportGraphDef(g.c, buf, opts, status.c)
