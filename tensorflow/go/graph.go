@@ -126,13 +126,13 @@ func (g *Graph) ImportFromReader(r io.Reader, size int, prefix string) error {
 	tmpbuf := make([]byte, 32*1024)
 	for {
 		nr, er := r.Read(tmpbuf)
+		if nCopied+nr > size {
+			return fmt.Errorf("graph def size to large for pre-allocated buffer")
+		}
 		if nr > 0 {
 			C.memcpy(unsafe.Pointer(uintptr(buf.data)+uintptr(nCopied)), unsafe.Pointer(&tmpbuf[0]), C.size_t(nr))
 		}
 		nCopied += nr
-		if nCopied > size {
-			return fmt.Errorf("graph def size to large for pre-allocated buffer")
-		}
 		if er != nil {
 			if er != io.EOF {
 				return er
