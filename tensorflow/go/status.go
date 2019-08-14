@@ -42,7 +42,6 @@ func newStatus() *status {
 func (s *status) finalizer() {
 	s.m.Lock()
 	defer s.m.Unlock()
-
 	if s.c != nil {
 		C.TF_DeleteStatus(s.c)
 	}
