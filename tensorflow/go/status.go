@@ -55,7 +55,7 @@ func (s *status) Delete() {
 func (s *status) Code() code {
 	s.m.Lock()
 	defer s.m.Unlock()
-	return code(C.TF_GetCode(s.c))
+	return s.codeLocked()
 }
 
 // codeLocked returns the code without locking - only to be used when the caller already holds the lock
