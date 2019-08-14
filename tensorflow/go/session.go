@@ -50,6 +50,8 @@ type Session struct {
 // options may be nil to use the default options.
 func NewSession(graph *Graph, options *SessionOptions) (*Session, error) {
 	status := newStatus()
+	defer status.Delete()
+
 	cOpt, doneOpt, err := options.c()
 	defer doneOpt()
 	if err != nil {
@@ -76,6 +78,8 @@ func (s *Session) ListDevices() ([]Device, error) {
 	var devices []Device
 
 	status := newStatus()
+	defer status.Delete()
+
 	devices_list := C.TF_SessionListDevices(s.c, status.c)
 	if err := status.Err(); err != nil {
 		return nil, fmt.Errorf("SessionListDevices() failed: %v", err)
@@ -129,6 +133,8 @@ func (s *Session) Run(feeds map[Output]*Tensor, fetches []Output, targets []*Ope
 
 	c := newCRunArgs(feeds, fetches, targets)
 	status := newStatus()
+	defer status.Delete()
+
 	C.TF_SessionRun(s.c, nil,
 		ptrOutput(c.feeds), ptrTensor(c.feedTensors), C.int(len(feeds)),
 		ptrOutput(c.fetches), ptrTensor(c.fetchTensors), C.int(len(fetches)),
@@ -172,6 +178,8 @@ func (pr *PartialRun) Run(feeds map[Output]*Tensor, fetches []Output, targets []
 		status = newStatus()
 		s      = pr.session
 	)
+	defer status.Delete()
+
 	s.mu.Lock()
 	if s.c == nil {
 		s.mu.Unlock()
@@ -210,6 +218,8 @@ func (s *Session) NewPartialRun(feeds, fetches []Output, targets []*Operation) (
 
 		status = newStatus()
 	)
+	defer status.Delete()
+
 	if len(feeds) > 0 {
 		pcfeeds = &cfeeds[0]
 		for i, o := range feeds {
@@ -262,7 +272,10 @@ func (s *Session) Close() error {
 	if s.c == nil {
 		return nil
 	}
+
 	status := newStatus()
+	defer status.Delete()
+
 	C.TF_CloseSession(s.c, status.c)
 	if err := status.Err(); err != nil {
 		return err
@@ -319,6 +332,8 @@ func (o *SessionOptions) c() (ret *C.TF_SessionOptions, done func(), err error) 
 	var cConfig unsafe.Pointer
 	if sz := len(o.Config); sz > 0 {
 		status := newStatus()
+		defer status.Delete()
+
 		// Copying into C-memory is the simplest thing to do in terms
 		// of memory safety and cgo rules ("C code may not keep a copy
 		// of a Go pointer after the call returns" from

@@ -19,37 +19,62 @@ package tensorflow
 // #include "tensorflow/c/c_api.h"
 import "C"
 
-import "runtime"
+import (
+	"runtime"
+	"sync"
+)
 
 type code C.TF_Code
 
 // status holds error information returned by TensorFlow. We convert all
 // TF statuses to Go errors.
 type status struct {
+	m sync.Mutex
 	c *C.TF_Status
 }
 
 func newStatus() *status {
-	s := &status{C.TF_NewStatus()}
+	s := &status{c: C.TF_NewStatus()}
 	runtime.SetFinalizer(s, (*status).finalizer)
 	return s
 }
 
 func (s *status) finalizer() {
-	C.TF_DeleteStatus(s.c)
+	s.m.Lock()
+	defer s.m.Unlock()
+	if s.c != nil {
+		C.TF_DeleteStatus(s.c)
+	}
+	s.c = nil
+}
+
+func (s *status) Delete() {
+	s.finalizer()
 }
 
 func (s *status) Code() code {
+	s.m.Lock()
+	defer s.m.Unlock()
+	return s.codeLocked()
+}
+
+// codeLocked returns the code without locking - only to be used when the caller already holds the lock
+func (s *status) codeLocked() code {
 	return code(C.TF_GetCode(s.c))
 }
 
 func (s *status) String() string {
+	s.m.Lock()
+	defer s.m.Unlock()
 	return C.GoString(C.TF_Message(s.c))
 }
 
 // Err converts the status to a Go error and returns nil if the status is OK.
 func (s *status) Err() error {
-	if s == nil || s.Code() == C.TF_OK {
+	s.m.Lock()
+	defer s.m.Unlock()
+	// Note that we call codeLocked here vs Code() because we are already holding the lock
+	if s == nil || s.codeLocked() == C.TF_OK {
 		return nil
 	}
 	return (*statusError)(s)
