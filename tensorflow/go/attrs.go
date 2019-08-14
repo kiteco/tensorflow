@@ -40,6 +40,8 @@ func (op *Operation) Attr(name string) (interface{}, error) {
 	defer C.free(unsafe.Pointer(cname))
 
 	status := newStatus()
+	defer status.Delete()
+
 	meta := C.TF_OperationGetAttrMetadata(op.c, cname, status.c)
 	if err := status.Err(); err != nil {
 		return nil, err
@@ -53,6 +55,7 @@ func (op *Operation) Attr(name string) (interface{}, error) {
 
 func listAttribute(op *Operation, cname *C.char, meta C.TF_AttrMetadata) (interface{}, error) {
 	status := newStatus()
+	defer status.Delete()
 
 	switch meta._type {
 	case C.TF_ATTR_STRING:
@@ -182,6 +185,7 @@ func listAttribute(op *Operation, cname *C.char, meta C.TF_AttrMetadata) (interf
 
 func scalarAttribute(op *Operation, cname *C.char, meta C.TF_AttrMetadata) (interface{}, error) {
 	status := newStatus()
+	defer status.Delete()
 
 	switch meta._type {
 	case C.TF_ATTR_STRING:

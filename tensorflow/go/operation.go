@@ -62,6 +62,7 @@ func (op *Operation) OutputListSize(output string) (int, error) {
 	cname := C.CString(output)
 	defer C.free(unsafe.Pointer(cname))
 	status := newStatus()
+	defer status.Delete()
 	n := C.TF_OperationOutputListLength(op.c, cname, status.c)
 	return int(n), status.Err()
 }
@@ -96,6 +97,8 @@ func (p Output) DataType() DataType {
 // Shape returns the (possibly incomplete) shape of the tensor produced p.
 func (p Output) Shape() Shape {
 	status := newStatus()
+	defer status.Delete()
+
 	port := p.c()
 	ndims := C.TF_GraphGetTensorNumDims(p.Op.g.c, port, status.c)
 	if err := status.Err(); err != nil {

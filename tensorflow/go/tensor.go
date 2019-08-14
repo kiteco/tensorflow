@@ -28,6 +28,7 @@ import (
 	"io"
 	"reflect"
 	"runtime"
+	"sync"
 	"unsafe"
 )
 
@@ -62,6 +63,7 @@ const (
 
 // Tensor holds a multi-dimensional array of elements of a single data type.
 type Tensor struct {
+	m     sync.Mutex
 	c     *C.TF_Tensor
 	shape []int64
 }
@@ -101,7 +103,9 @@ func NewTensor(value interface{}) (*Tensor, error) {
 			return nil, bug("NewTensor incorrectly calculated the size of a tensor with type %v and shape %v as %v bytes instead of %v", dataType, shape, nbytes, buf.Len())
 		}
 	} else {
-		e := stringEncoder{offsets: buf, data: raw[nflattened*8:], status: newStatus()}
+		s := newStatus()
+		defer s.Delete()
+		e := stringEncoder{offsets: buf, data: raw[nflattened*8:], status: s}
 		if err := e.encode(reflect.ValueOf(value), shape); err != nil {
 			return nil, err
 		}
@@ -151,7 +155,19 @@ func newTensorFromC(c *C.TF_Tensor) *Tensor {
 	return t
 }
 
-func (t *Tensor) finalize() { C.TF_DeleteTensor(t.c) }
+func (t *Tensor) finalize() {
+	t.m.Lock()
+	defer t.m.Unlock()
+	if t.c != nil {
+		C.TF_DeleteTensor(t.c)
+	}
+	t.c = nil
+}
+
+// Delete will delete the tensor
+func (t *Tensor) Delete() {
+	t.finalize()
+}
 
 // DataType returns the scalar datatype of the Tensor.
 func (t *Tensor) DataType() DataType { return DataType(C.TF_TensorType(t.c)) }
@@ -176,8 +192,10 @@ func (t *Tensor) Value() interface{} {
 			panic(bug("unable to decode Tensor of type %v and shape %v - %v", t.DataType(), t.Shape(), err))
 		}
 	} else {
+		s := newStatus()
+		defer s.Delete()
 		nflattened := numElements(t.Shape())
-		d := stringDecoder{offsets: bytes.NewReader(raw[0 : 8*nflattened]), data: raw[8*nflattened:], status: newStatus()}
+		d := stringDecoder{offsets: bytes.NewReader(raw[0 : 8*nflattened]), data: raw[8*nflattened:], status: s}
 		if err := d.decode(val, t.Shape()); err != nil {
 			panic(bug("unable to decode String tensor with shape %v - %v", t.Shape(), err))
 		}

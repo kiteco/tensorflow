@@ -46,32 +46,50 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"sync"
 	"unsafe"
 )
 
 // Graph represents a computation graph. Graphs may be shared between sessions.
 type Graph struct {
+	m sync.Mutex
 	c *C.TF_Graph
 }
 
 // NewGraph returns a new Graph.
 func NewGraph() *Graph {
-	g := &Graph{C.TF_NewGraph()}
+	g := &Graph{c: C.TF_NewGraph()}
 	runtime.SetFinalizer(g, (*Graph).finalizer)
 	return g
 }
 
 func (g *Graph) finalizer() {
-	C.TF_DeleteGraph(g.c)
+	g.m.Lock()
+	defer g.m.Unlock()
+	if g.c != nil {
+		C.TF_DeleteGraph(g.c)
+	}
+	g.c = nil
+}
+
+// Delete deletes the graph
+func (g *Graph) Delete() {
+	g.finalizer()
 }
 
 // WriteTo writes out a serialized representation of g to w.
 //
 // Implements the io.WriterTo interface.
 func (g *Graph) WriteTo(w io.Writer) (int64, error) {
+	g.m.Lock()
+	defer g.m.Unlock()
+
 	buf := C.TF_NewBuffer()
 	defer C.TF_DeleteBuffer(buf)
+
 	status := newStatus()
+	defer status.Delete()
+
 	C.TF_GraphToGraphDef(g.c, buf, status.c)
 	if err := status.Err(); err != nil {
 		return 0, err
@@ -145,6 +163,10 @@ func (g *Graph) ImportFromReader(r io.Reader, size int, prefix string) error {
 	buf.length = C.size_t(nCopied)
 
 	status := newStatus()
+	defer status.Delete()
+
+	g.m.Lock()
+	defer g.m.Unlock()
 	C.TF_GraphImportGraphDef(g.c, buf, opts, status.c)
 	if err := status.Err(); err != nil {
 		return err
@@ -250,6 +272,8 @@ func (g *Graph) AddOperation(args OpSpec) (*Operation, error) {
 		C.TF_AddControlInput(cdesc, in.c)
 	}
 	status := newStatus()
+	defer status.Delete()
+
 	for name, value := range args.Attrs {
 		if err := setAttr(cdesc, status, name, value); err != nil {
 			// Memory leak here as the TF_OperationDescription
