@@ -93,7 +93,7 @@ func NewTensor(value interface{}) (*Tensor, error) {
 		shape: shape,
 	}
 	runtime.SetFinalizer(t, (*Tensor).finalize)
-	raw := tensorData(t.c)
+	raw := t.tensorData()
 	buf := bytes.NewBuffer(raw[:0:len(raw)])
 	if dataType != String {
 		if err := encodeTensor(buf, val, shape); err != nil {
@@ -134,7 +134,7 @@ func ReadTensor(dataType DataType, shape []int64, r io.Reader) (*Tensor, error) 
 		shape: shape,
 	}
 	runtime.SetFinalizer(t, (*Tensor).finalize)
-	raw := tensorData(t.c)
+	raw := t.tensorData()
 	if _, err := io.ReadFull(r, raw); err != nil {
 		return nil, err
 	}
@@ -169,8 +169,18 @@ func (t *Tensor) Delete() {
 	t.finalize()
 }
 
+func (t *Tensor) tensorData() []byte {
+	t.m.Lock()
+	defer t.m.Unlock()
+	return tensorData(t.c)
+}
+
 // DataType returns the scalar datatype of the Tensor.
-func (t *Tensor) DataType() DataType { return DataType(C.TF_TensorType(t.c)) }
+func (t *Tensor) DataType() DataType {
+	t.m.Lock()
+	defer t.m.Unlock()
+	return DataType(C.TF_TensorType(t.c))
+}
 
 // Shape returns the shape of the Tensor.
 func (t *Tensor) Shape() []int64 { return t.shape }
@@ -186,7 +196,7 @@ func (t *Tensor) Shape() []int64 { return t.shape }
 func (t *Tensor) Value() interface{} {
 	typ := typeOf(t.DataType(), t.Shape())
 	val := reflect.New(typ)
-	raw := tensorData(t.c)
+	raw := t.tensorData()
 	if t.DataType() != String {
 		if err := decodeTensor(bytes.NewReader(raw), t.Shape(), typ, val); err != nil {
 			panic(bug("unable to decode Tensor of type %v and shape %v - %v", t.DataType(), t.Shape(), err))
@@ -215,7 +225,7 @@ func (t *Tensor) WriteContentsTo(w io.Writer) (int64, error) {
 	if err := isTensorSerializable(t.DataType()); err != nil {
 		return 0, err
 	}
-	return io.Copy(w, bytes.NewReader(tensorData(t.c)))
+	return io.Copy(w, bytes.NewReader(t.tensorData()))
 }
 
 func tensorData(c *C.TF_Tensor) []byte {
