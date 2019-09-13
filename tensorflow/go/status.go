@@ -66,6 +66,10 @@ func (s *status) codeLocked() code {
 func (s *status) String() string {
 	s.m.Lock()
 	defer s.m.Unlock()
+	return s.stringLocked()
+}
+
+func (s *status) stringLocked() string {
 	return C.GoString(C.TF_Message(s.c))
 }
 
@@ -77,7 +81,8 @@ func (s *status) Err() error {
 	if s == nil || s.codeLocked() == C.TF_OK {
 		return nil
 	}
-	return (*statusError)(s)
+
+	return statusError(s.stringLocked())
 }
 
 // statusError is distinct from status because it fulfills the error interface.
@@ -85,8 +90,8 @@ func (s *status) Err() error {
 //
 // TODO(jhseu): Make public, rename to Error, and provide a way for users to
 // check status codes.
-type statusError status
+type statusError string
 
-func (s *statusError) Error() string {
-	return (*status)(s).String()
+func (s statusError) Error() string {
+	return string(s)
 }
