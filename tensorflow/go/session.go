@@ -168,6 +168,13 @@ func (s *Session) Run(feeds map[Output]*Tensor, fetches []Output, targets []*Ope
 type PartialRun struct {
 	session *Session
 	handle  *C.char
+
+	// For ensuring that:
+	// - Close() blocks on all Run() calls to complete.
+	// - Close() can be called multiple times.
+	wg     sync.WaitGroup
+	mu     sync.Mutex
+	closed bool
 }
 
 // Run resumes execution of the graph to compute the requested fetches and
@@ -188,6 +195,15 @@ func (pr *PartialRun) Run(feeds map[Output]*Tensor, fetches []Output, targets []
 	s.wg.Add(1)
 	s.mu.Unlock()
 	defer s.wg.Done()
+
+	pr.mu.Lock()
+	if pr.closed {
+		pr.mu.Unlock()
+		return nil, errors.New("partial run closed")
+	}
+	pr.wg.Add(1)
+	pr.mu.Unlock()
+	defer pr.wg.Done()
 
 	C.TF_SessionPRun(s.c, pr.handle,
 		ptrOutput(c.feeds), ptrTensor(c.feedTensors), C.int(len(feeds)),
@@ -258,9 +274,25 @@ func (s *Session) NewPartialRun(feeds, fetches []Output, targets []*Operation) (
 		return nil, err
 	}
 	runtime.SetFinalizer(pr, func(pr *PartialRun) {
-		C.TF_DeletePRunHandle(pr.handle)
+		pr.Close()
 	})
 	return pr, nil
+}
+
+// Close forces cleanup of the partial run
+func (pr *PartialRun) Close() error {
+	pr.mu.Lock()
+	defer pr.mu.Unlock()
+	pr.wg.Wait()
+
+	if pr.closed {
+		return nil
+	}
+	pr.closed = true
+
+	C.TF_DeletePRunHandle(pr.handle)
+
+	return nil
 }
 
 // Close a session. This contacts any other processes associated with this
