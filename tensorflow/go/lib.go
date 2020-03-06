@@ -16,6 +16,12 @@ limitations under the License.
 
 package tensorflow
 
+// #cgo windows CFLAGS: -I${SRCDIR}/../../../../../../windows/tensorflow/include
+// #cgo windows LDFLAGS: -L${SRCDIR}/../../../../../../windows/tensorflow/lib
+// #cgo darwin CFLAGS: -I${SRCDIR}/../../../../../../osx/tensorflow/include
+// #cgo darwin LDFLAGS: -L${SRCDIR}/../../../../../../osx/tensorflow/lib
+// #cgo linux CFLAGS: -I${SRCDIR}/../../../../../../linux/tensorflow/include
+// #cgo linux LDFLAGS: -L${SRCDIR}/../../../../../../linux/tensorflow/lib -Wl,-rpath,${SRCDIR}/../../../../../../linux/tensorflow/lib
 // #cgo LDFLAGS: -ltensorflow
 // #cgo CFLAGS: -I${SRCDIR}/../../
 import "C"
