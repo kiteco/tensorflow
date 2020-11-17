@@ -17,7 +17,7 @@ limitations under the License.
 package tensorflow
 
 // #cgo windows CFLAGS: -I${SRCDIR}/../../../../../../../src/github.com/kiteco/kiteco/windows/tensorflow/include
-// #cgo windows LDFLAGS: -L${SRCDIR}/../../../../../../../src/github.com/kiteco/kiteco/indows/tensorflow/lib -ltensorflow
+// #cgo windows LDFLAGS: -L${SRCDIR}/../../../../../../../src/github.com/kiteco/kiteco/windows/tensorflow/lib -ltensorflow
 // #cgo darwin CFLAGS: -I${SRCDIR}/../../../../../../../src/github.com/kiteco/kiteco/osx/tensorflow/include
 // #cgo darwin LDFLAGS: -L${SRCDIR}/../../../../../../../src/github.com/kiteco/kiteco/osx/tensorflow/lib -Wl,-undefined,dynamic_lookup
 // #cgo linux CFLAGS: -I${SRCDIR}/../../../../../../../src/github.com/kiteco/kiteco/linux/tensorflow/include
