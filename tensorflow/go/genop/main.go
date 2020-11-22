@@ -29,7 +29,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/tensorflow/tensorflow/tensorflow/go/genop/internal"
+	"github.com/kiteco/tensorflow/tensorflow/go/genop/internal"
 )
 
 func main() {
