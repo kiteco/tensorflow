@@ -26,7 +26,7 @@ limitations under the License.
 package op
 
 import (
-	tf "github.com/tensorflow/tensorflow/tensorflow/go"
+	tf "github.com/kiteco/tensorflow/tensorflow/go"
 )
 
 // Const adds an operation to graph that produces value as output.
