@@ -36,7 +36,7 @@ func TestPlaceholder(t *testing.T) {
 }
 
 func TestAddOperationFailure(t *testing.T) {
-	// Inspired from https://github.com/kiteco/tensorflow/issues/9931
+	// Inspired from https://github.com/tensorflow/tensorflow/issues/9931
 	s := NewScope()
 
 	resize := ResizeArea(s, Placeholder(s, tf.Float), Const(s, []int64{80, 80}))
@@ -98,7 +98,7 @@ func TestDataset(t *testing.T) {
 		s = NewScope()
 
 		// The use of a non-scalar here is inspired by
-		// https://github.com/kiteco/tensorflow/issues/14891
+		// https://github.com/tensorflow/tensorflow/issues/14891
 		c       = Const(s, []int32{21718, 31415})
 		types   = []tf.DataType{c.DataType()}
 		shapes  = []tf.Shape{c.Shape()}
